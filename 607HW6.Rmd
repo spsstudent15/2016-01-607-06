@@ -1,0 +1,94 @@
+---
+title: "Data 607 Week 6: Flight Data Reshaping"
+author: "Armenoush Aslanian-Persico"
+output:
+  html_document:
+    highlight: tango
+    theme: cerulean
+  pdf_document: default
+---
+
+#Load packages.
+```{r}
+library(knitr)
+library(stringr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(RCurl)
+```
+
+
+# Import CSV, column header = True.
+```{r}
+x <- getURL("https://raw.githubusercontent.com/spsstudent15/2016-01-607-06/master/flights.csv")
+flights<-data.frame(read.csv(text=x, header=T))
+flights
+#str(flights) #check structure
+```
+
+# Reshape data with city columns as factors.
+```{r}
+flights2 <- flights %>% 
+  gather("City","NumFlights",3:7)
+kable(flights2)
+```
+
+
+# Reshape data with Arrival factors as columns.
+```{r}
+flights3 <- flights2 %>% 
+  spread(Arrival,NumFlights,fill=NA)
+colnames(flights3)<-c("Airline","City","Delayed","OnTime")
+kable(flights3)
+```
+
+# Add calculated column for Total Flights.
+```{r}
+flights4<-mutate(flights3, TotalFlights=(Delayed+OnTime))
+kable(flights4)
+```
+
+# Add calculated column for Percent On Time.
+```{r}
+flights5<-mutate(flights4, PercentOnTime=round((OnTime/TotalFlights),2))
+kable(flights5)
+```
+
+# Show percent delay by airline.
+```{r}
+sumairline<-aggregate(cbind(Delayed,OnTime,TotalFlights) ~ Airline, data = flights5, sum)
+sumairline<-mutate(sumairline,PercentOnTime=round((OnTime/TotalFlights),3))
+kable(sumairline)
+```
+
+# Show percent delay by city, ordered by percent on time ascending.
+```{r}
+sumcity<-aggregate(cbind(Delayed,OnTime,TotalFlights) ~ City, data = flights5, sum)
+sumcity<-mutate(sumcity,PercentOnTime=round((OnTime/TotalFlights),3))
+sumcity<-sumcity[ order(sumcity[,5]), ]
+kable(sumcity)
+```
+
+# Show bar plots.
+
+```{r}
+ggplot(flights5, aes(x = Airline, y = PercentOnTime, fill = Airline)) + geom_bar(stat = "identity", color="black") + ggtitle("Percent On Time Airline Arrivals by Airline and City") + facet_wrap(~ City, nrow = 2)+ ylim(0, 1) + theme(panel.grid.minor.x=element_blank(), panel.grid.major.x=element_blank()) +scale_fill_manual(values=c("#56B4E9", "#0000CC"))
+```
+
+```{r}
+ggplot(sumcity, aes(x = City, y = PercentOnTime)) + geom_bar(stat = "identity",fill="#9999CC",color="black") + ggtitle("Percent On Time Airline Arrivals by City")+ theme(panel.grid.minor.x=element_blank(), panel.grid.major.x=element_blank()) + coord_cartesian(ylim = c(.5, 1)) 
+```
+
+```{r}
+ggplot(sumairline, aes(x = Airline, y = TotalFlights)) + geom_bar(stat = "identity",fill="#ADFF2F",color="black") + ggtitle("Total Flights by Airline")+ theme(panel.grid.minor.x=element_blank(), panel.grid.major.x=element_blank())
+```
+
+# Conclusion
+### Alaska Airlines has better on-time arrival percentages for these five cities. 
+
+### A city comparison shows that San Francisco has the most delays of these cities and Phoenix has the least delays.
+
+### The gap between the two airlines is most significant for San Francisco and Seattle. We would need more information on what factors cause a flight to be delayed. 
+
+### For example, San Francisco and Seattle might have the worst weather of all of these cities, and Alaska Airlines may have special equipment or training which helps with poor weather. Alaska also has a smaller total number of flights to these cities, which may contribute to better on-time percentages. 
